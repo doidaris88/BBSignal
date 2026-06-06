@@ -920,12 +920,97 @@ function saveAlertHistory(){
 }
 
 // ── REQUEST NOTIF PERMISSION ───────────────────────────────────────
+// ── AUDIO ENGINE (Web Audio API — no file needed) ──────────────────
+// AudioContext dibuat lazy (harus ada user gesture dulu di iOS/Android)
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx || _audioCtx.state==='closed'){
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // iOS: resume jika suspended
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// Inisiasi AudioContext saat ada interaksi pertama user
+// agar suara bisa langsung muncul saat alert terjadi kemudian
+function unlockAudio(){
+  try{ getAudioCtx(); }catch(e){}
+  document.removeEventListener('touchstart', unlockAudio);
+  document.removeEventListener('click', unlockAudio);
+}
+document.addEventListener('touchstart', unlockAudio, {once:true, passive:true});
+document.addEventListener('click', unlockAudio, {once:true});
+
+/**
+ * playTone — buat nada synth tanpa file audio
+ * @param {Array} notes  [{freq, dur, startAt}]  dur & startAt dalam detik
+ * @param {string} type  oscillator type: sine|square|sawtooth|triangle
+ * @param {number} gain  volume 0–1
+ */
+function playTone(notes, type='sine', gain=0.35){
+  try{
+    const ctx = getAudioCtx();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(gain, ctx.currentTime);
+    master.connect(ctx.destination);
+
+    notes.forEach(({freq, dur, startAt=0, ramp=false})=>{
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + startAt);
+      // Fade out di akhir nada (menghindari klik/pop)
+      g.gain.setValueAtTime(1, ctx.currentTime + startAt);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + dur);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(ctx.currentTime + startAt);
+      osc.stop(ctx.currentTime + startAt + dur + 0.05);
+    });
+  }catch(e){ /* AudioContext tidak tersedia */ }
+}
+
+// 🟢 BUY — nada naik ceria (ascending 3-note chime)
+function soundBuy(){
+  playTone([
+    {freq:523, dur:0.13, startAt:0},    // C5
+    {freq:659, dur:0.13, startAt:0.13}, // E5
+    {freq:784, dur:0.22, startAt:0.26}, // G5
+  ], 'sine', 0.38);
+}
+
+// 🔴 SELL — nada turun tegas (descending 3-note alert)
+function soundSell(){
+  playTone([
+    {freq:784, dur:0.13, startAt:0},    // G5
+    {freq:622, dur:0.13, startAt:0.13}, // Eb5
+    {freq:466, dur:0.28, startAt:0.26}, // Bb4
+  ], 'triangle', 0.40);
+}
+
+// 🟡 HOLD — nada netral pendek (double beep)
+function soundHold(){
+  playTone([
+    {freq:600, dur:0.1,  startAt:0},
+    {freq:600, dur:0.1,  startAt:0.18},
+  ], 'sine', 0.28);
+}
+
+// Dispatch suara berdasarkan sinyal
+function playAlertSound(action){
+  if(action==='BUY')  soundBuy();
+  else if(action==='SELL') soundSell();
+  else soundHold();
+}
+
 async function requestNotifPermission(){
   if(!('Notification' in window)) return 'unsupported';
   if(Notification.permission==='granted') return 'granted';
   const result = await Notification.requestPermission();
   return result;
 }
+
 
 // ── SEND WEB NOTIFICATION ──────────────────────────────────────────
 function sendWebNotif(title, body, icon){
@@ -958,6 +1043,9 @@ function showAlertBanner(entry){
   banner.classList.add('show');
   clearTimeout(alertBannerTimer);
   alertBannerTimer = setTimeout(()=>banner.classList.remove('show'), 5000);
+
+  // 🔊 Bunyikan suara notifikasi sesuai sinyal
+  playAlertSound(entry.to);
 }
 
 function dismissAlertBanner(){
