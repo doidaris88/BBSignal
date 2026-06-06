@@ -163,12 +163,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 /* SKELETON */
 .sk{background:linear-gradient(90deg,var(--bg3) 25%,var(--dim) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px}
 
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--buy)}50%{opacity:.4;box-shadow:0 0 3px var(--buy)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes shimmer{to{background-position:-200% 0}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-
 /* ── ALERT BANNER ──────────────────────────────────────────────── */
 .alert-banner{position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-110%);width:100%;max-width:480px;z-index:500;padding:0 12px;transition:transform .35s cubic-bezier(.34,1.56,.64,1);pointer-events:none}
 .alert-banner.show{transform:translateX(-50%) translateY(0);pointer-events:all}
@@ -215,6 +209,12 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .notif-bar b{color:var(--text)}
 .notif-allow{margin-left:auto;background:var(--buy);color:#000;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;flex-shrink:0;letter-spacing:1px}
 
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--buy)}50%{opacity:.4;box-shadow:0 0 3px var(--buy)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{to{background-position:-200% 0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
 </head>
 <body>
 <div id="app">
@@ -1114,22 +1114,21 @@ refreshAll(true);
 
 <script>
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    // Gunakan path relatif agar berjalan di GitHub Pages subdirectory
-    const swPath = new URL('sw.js', import.meta?.url || location.href).pathname;
+  window.addEventListener('load', function() {
+    // Path relatif dari lokasi halaman saat ini - kompatibel dengan GitHub Pages
+    var swPath = './sw.js';
     navigator.serviceWorker.register(swPath)
-      .then(reg => {
-        // Paksa update service worker jika ada versi baru
-        reg.addEventListener('updatefound', () => {
-          const nw = reg.installing;
-          nw.addEventListener('statechange', () => {
+      .then(function(reg) {
+        reg.addEventListener('updatefound', function() {
+          var nw = reg.installing;
+          nw.addEventListener('statechange', function() {
             if(nw.state === 'installed' && navigator.serviceWorker.controller){
               toast('Update tersedia · Refresh untuk memperbarui');
             }
           });
         });
       })
-      .catch(err => console.warn('SW register failed:', err));
+      .catch(function(err){ console.warn('SW register failed:', err); });
   });
 }
 </script>
